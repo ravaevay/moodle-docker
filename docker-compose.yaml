@@ -1,0 +1,78 @@
+version: '3.3'
+
+services:
+  mariadb:
+    image: bitnami/mariadb:latest
+    container_name: moodle_mariadb
+    environment:
+      - MARIADB_ROOT_PASSWORD=root_password
+      - MARIADB_DATABASE=moodle
+      - MARIADB_USER=moodle_user
+      - MARIADB_PASSWORD=moodle_password
+    volumes:
+      - mariadb_data:/bitnami/mariadb
+    restart: always
+
+  moodle:
+    image: bitnami/moodle:latest
+    build: .
+    container_name: moodle_web
+    environment:
+      - MOODLE_DATABASE_TYPE=mariadb
+      - MOODLE_DATABASE_HOST=mariadb
+      - MOODLE_DATABASE_PORT_NUMBER=3306
+      - MOODLE_DATABASE_NAME=moodle
+      - MOODLE_DATABASE_USER=moodle_user
+      - MOODLE_DATABASE_PASSWORD=moodle_password
+      - MOODLE_USERNAME=admin
+      - MOODLE_PASSWORD=password
+        #- MOODLE_REVERSEPROXY=true
+        #- MOODLE_SSLPROXY=true
+      - MOODLE_EMAIL=admin@example.com
+      - VIRTUAL_HOST=moodle.example.com
+      - LETSENCRYPT_HOST=moodle.example.com
+      - LETSENCRYPT_EMAIL=admin@example.com
+    volumes:
+      - moodle_data:/bitnami/moodle
+    depends_on:
+      - mariadb
+    restart: always
+
+  nginx-proxy:
+    image: jwilder/nginx-proxy:alpine
+    container_name: nginx_proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+      - nginx_certs:/etc/nginx/certs
+      - nginx_vhost:/etc/nginx/vhost.d
+      - nginx_html:/usr/share/nginx/html
+    restart: always
+
+  letsencrypt:
+    image: jrcs/letsencrypt-nginx-proxy-companion
+    container_name: letsencrypt
+    depends_on:
+      - nginx-proxy
+    environment:
+      - NGINX_PROXY_CONTAINER=nginx_proxy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - nginx_certs:/etc/nginx/certs
+      - nginx_vhost:/etc/nginx/vhost.d
+      - nginx_html:/usr/share/nginx/html
+    restart: always
+
+volumes:
+  mariadb_data:
+    driver: local
+  moodle_data:
+    driver: local
+  nginx_certs:
+    driver: local
+  nginx_vhost:
+    driver: local
+  nginx_html:
+    driver: local
